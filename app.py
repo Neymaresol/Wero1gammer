@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from engine import SupplierQuote, MarketQuote, evaluate, D
+from catalog_gates import CatalogCandidate, validate
 
-app = FastAPI(title="Wero1Gammer PARADIGMA", version="0.1.0-dev")
+app = FastAPI(title="Wero1Gammer PARADIGMA", version="0.2.0-dev")
 
 class QuoteInput(BaseModel):
     supplier: str
@@ -24,9 +25,20 @@ class EvaluationInput(BaseModel):
     suppliers: list[QuoteInput] = Field(max_length=100)
     market: list[MarketInput] = Field(max_length=100)
 
+class CatalogInput(BaseModel):
+    sku: str = Field(min_length=1)
+    tier: str
+    category: str
+    supplier_authorized: bool
+    stock_confirmed: bool
+    warranty_confirmed: bool
+    market_price_verified: bool
+    supplier_total_brl: str
+    proposed_price_brl: str
+
 @app.get("/health")
 def health():
-    return {"service": "wero1gammer", "status": "staging", "version": "0.1.0-dev", "checkout_enabled": False}
+    return {"service": "wero1gammer", "status": "staging", "version": "0.2.0-dev", "checkout_enabled": False, "publication_enabled": False}
 
 @app.post("/api/pricing/evaluate")
 def pricing(payload: EvaluationInput):
@@ -37,3 +49,8 @@ def pricing(payload: EvaluationInput):
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid monetary value")
     return evaluate(payload.sku, payload.category, suppliers, market)
+
+@app.post("/api/catalog/validate")
+def catalog_validate(payload: CatalogInput):
+    """Read-only evaluation; never creates an offer, order or publication."""
+    return validate(CatalogCandidate(**payload.model_dump()))
